@@ -25,7 +25,7 @@ const SalaPartida = () => {
         if (!socket) {
             socket = io("http://localhost:4000");
             socket.on('connect', () => {
-                const jugador = { id: socket.id, nombre: 'Jugador', socketId: socket.id };
+                //const jugador = { id: socket.id, nombre: 'Jugador', socketId: socket.id };
                 socket.emit('joinRoom', { pin, jugador });
             });
         }

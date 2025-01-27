@@ -164,6 +164,7 @@ app.get('/partidas/:pin', async (req, res) => {
 app.post('/partidas/:pin/jugadores', async (req, res) => {
     const { pin } = req.params;
     const { jugador } = req.body;
+    console.log('Añadiendo jugador:', jugador);
     try {
         const q = query(collection(dbFirestore, 'partidas'), where("pin_de_la_sala", "==", pin));
         const querySnapshot = await getDocs(q);
