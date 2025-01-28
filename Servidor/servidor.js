@@ -45,17 +45,20 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', async ({ pin, jugador }) => {
         socket.join(pin);
 
-        // Actualizar la base de datos con el nuevo jugador
+        // Actualizar la base de datos con el nuevo jugador si no está ya en la sala
         const q = query(collection(dbFirestore, 'partidas'), where("pin_de_la_sala", "==", pin));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
             const partidaDoc = querySnapshot.docs[0];
             const partidaData = partidaDoc.data();
-            const jugadoresActualizados = [...partidaData.jugadores, { ...jugador, socketId: socket.id }];
-            await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
+            const jugadorExistente = partidaData.jugadores.find(j => j.id === jugador.id);
+            if (!jugadorExistente) {
+                const jugadoresActualizados = [...partidaData.jugadores, { ...jugador, socketId: socket.id }];
+                await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
 
-            // Emitir evento a todos los clientes en la sala
-            io.to(pin).emit('newPlayer', jugador);
+                // Emitir evento a todos los clientes en la sala
+                io.to(pin).emit('newPlayer', jugador);
+            }
         }
     });
 

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import axios from "axios";
 
 let socket;
 
@@ -14,11 +13,10 @@ const UnirseAPartida = () => {
         try {
             if (!socket) {
                 socket = io("http://localhost:4000");
-                socket.on('connect', async () => {
-                    const jugador = { id: socket.id, nombre };
-                    await axios.post(`http://localhost:4000/partidas/${pin}/jugadores`, { jugador });
+                socket.on('connect', () => {
+                    const jugador = { id: socket.id, nombre, socketId: socket.id }; // Asegurarse de que el jugador tenga un socketId único
                     socket.emit('joinRoom', { pin, jugador });
-                    navigate(`/SalaPartida/${pin}`);
+                    navigate(`/SalaPartida/${pin}`, { state: { jugador: { id: jugador.id, nombre: jugador.nombre } } });
                 });
             }
         } catch (error) {
@@ -28,7 +26,7 @@ const UnirseAPartida = () => {
 
     const handleLeave = () => {
         if (socket) {
-            const jugador = { id: socket.id, nombre };
+            const jugador = { id: socket.id, nombre, socketId: socket.id }; // Asegurarse de que el jugador tenga un socketId único
             socket.emit('leaveRoom', { pin, jugador });
             socket.disconnect();
             socket = null;

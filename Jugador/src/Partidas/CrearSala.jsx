@@ -1,52 +1,49 @@
 import React, { useEffect , useState} from "react";
-import { useNavigate} from "react-router-dom"
-import axios from "axios"
+import { useNavigate} from "react-router-dom";
+import axios from "axios";
 
 const generarPin = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-
 const CrearSala = () => {
+    const navega = useNavigate();
+    const [cuestionarios, setCuestionarios] = useState([]);
+    const [usuarios, setUsuarios] = useState([]);
+    const [sala, setSala] = useState({
+        nombre_de_la_sala: '',
+        pin_de_la_sala: generarPin(),
+        cuestionario_id: '',
+        creador_id: '',
+        creador_nombre: ''
+    });
 
-    const navega = useNavigate()
-    const [cuestionarios,setCuestionarios]=useState([])
-    const [usuarios,setUsuarios]=useState([])
-    const [sala,setSala]=useState({
-        nombre_de_la_sala:'',
-        pin_de_la_sala:generarPin(),
-        cuestionario_id:'',
-        creador_id:'',
-        creador_nombre:''
-    })
-    
-
-    useEffect(()=>{
-        const buscaCuestionarios = async () =>{
+    useEffect(() => {
+        const buscaCuestionarios = async () => {
             try {
-                const resultado = await axios.get("http://localhost:4000/cuestionarios")
-                console.log(resultado.data)
-                setCuestionarios(resultado.data)
+                const resultado = await axios.get("http://localhost:4000/cuestionarios");
+                console.log(resultado.data);
+                setCuestionarios(resultado.data);
             } catch (error) {
-                console.log(error)
+                console.log(error);
             }
-        }
+        };
         const buscaUsuarios = async () => {
-            try{
-               const resultado = await axios("http://localhost:4000/usuarios")  
-               console.log("estoy por aqui")
-               setUsuarios(resultado.data)
-            }catch(error){
-             console.log(error)
+            try {
+                const resultado = await axios("http://localhost:4000/usuarios");
+                console.log("estoy por aqui");
+                setUsuarios(resultado.data);
+            } catch (error) {
+                console.log(error);
             }
-        } 
-        buscaCuestionarios()
-        buscaUsuarios()
-    },[])
+        };
+        buscaCuestionarios();
+        buscaUsuarios();
+    }, []);
 
     const crearUnaSala = async (e) => {
         e.preventDefault();
-        try{
+        try {
             // Obtener el nombre del creador basado en el creador_id
             const creador = usuarios.find(usuario => usuario.id === parseInt(sala.creador_id));
             const salaConNombreCreador = {
@@ -54,12 +51,12 @@ const CrearSala = () => {
                 creador_nombre: creador ? creador.nombre : ''
             };
             console.log("Datos de la sala a enviar:", salaConNombreCreador);
-            await axios.put("http://localhost:4000/partidas", salaConNombreCreador)
-            navega(`/SalaPartida/${sala.pin_de_la_sala}`)
-        }catch(error){
-            console.log(error)
-        }        
-    }
+            await axios.put("http://localhost:4000/partidas", salaConNombreCreador);
+            navega(`/SalaPartida/${sala.pin_de_la_sala}`, { state: { jugador: { id: sala.creador_id, nombre: salaConNombreCreador.creador_nombre } } });
+        } catch (error) {
+            console.log(error);
+        }
+    };
 
     const gestionSala = (e) => {
         setSala({
@@ -108,5 +105,6 @@ const CrearSala = () => {
             </form>
         </>
     );
-}
+};
+
 export default CrearSala;
