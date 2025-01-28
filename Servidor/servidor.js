@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collectionGroup, getDocs, addDoc, collection, query, where, doc, updateDoc } from "firebase/firestore";
+import { deleteDoc, getFirestore, collectionGroup, getDocs, addDoc, collection, query, where, doc, updateDoc } from "firebase/firestore";
 import { Server } from 'socket.io';
 import http from 'http';
 
@@ -39,11 +39,18 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const dbFirestore = getFirestore(firebaseApp);
 
+const deleteTimers = {};
+
 io.on('connection', (socket) => {
     console.log('a user connected');
 
     socket.on('joinRoom', async ({ pin, jugador }) => {
         socket.join(pin);
+
+        if(deleteTimers[pin]) {
+            clearTimeout(deleteTimers[pin]);
+            delete deleteTimers[pin];
+        }
 
         // Actualizar la base de datos con el nuevo jugador si no está ya en la sala
         const q = query(collection(dbFirestore, 'partidas'), where("pin_de_la_sala", "==", pin));
@@ -72,8 +79,16 @@ io.on('connection', (socket) => {
             const partidaDoc = querySnapshot.docs[0];
             const partidaData = partidaDoc.data();
             const jugadoresActualizados = partidaData.jugadores.filter(j => j.id !== jugador.id);
-            await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
 
+            if(jugadoresActualizados.length === 0) {
+                // Iniciar el temporizador de eliminación si no quedan jugadores
+                deleteTimers[pin] = setTimeout(async () => {
+                    await deleteDoc(doc(dbFirestore, 'partidas', partidaDoc.id));
+                    delete deleteTimers[pin];
+                }, 60000); // 60 segundos
+            } else{
+                await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
+            }
             // Emitir evento a todos los clientes en la sala
             io.to(pin).emit('playerLeft', jugador);
         }
@@ -98,7 +113,15 @@ io.on('connection', (socket) => {
                 if (jugadorDesconectado) {
                     // Actualizar la base de datos para eliminar al jugador
                     const jugadoresActualizados = partidaData.jugadores.filter(j => j.socketId !== socket.id);
-                    await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
+                    if(jugadoresActualizados.length === 0) {
+                        // Iniciar el temporizador de eliminación si no quedan jugadores
+                        deleteTimers[pin] = setTimeout(async () => {
+                        await deleteDoc(doc(dbFirestore, 'partidas', partidaDoc.id));
+                        delete deleteTimers[pin];
+                }, 60000); // 60 segundos
+                    } else{
+                        await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
+                    }
 
                     // Emitir evento a todos los clientes en la sala
                     io.to(pin).emit('playerLeft', jugadorDesconectado);
