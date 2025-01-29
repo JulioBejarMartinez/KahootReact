@@ -12,6 +12,7 @@ const SalaPartida = () => {
     const [jugador, setJugador] = useState(location.state?.jugador || null); // Estado para almacenar el jugador
     const [partidaIniciada, setPartidaIniciada] = useState(false);
     const [preguntaActual, setPreguntaActual] = useState(0);
+    const [tiempoRestante, setTiempoRestante] = useState(0);
 
     useEffect(() => {
         const obtenerPartida = async () => {
@@ -56,8 +57,9 @@ const SalaPartida = () => {
         });
 
         socket.on('partidaIniciada', () => {
-            setPartidaIniciada(true);
             console.log('La partida ha comenzado');
+            setPartidaIniciada(true);
+            iniciarTemporizador(partida.preguntas[preguntaActual].tiempo_respuesta);
         });
 
         return () => {
@@ -70,6 +72,26 @@ const SalaPartida = () => {
             socket = null;
         };
     }, [pin, jugador]);
+
+    useEffect(() => {
+        if (partidaIniciada && partida) {
+            iniciarTemporizador(partida.preguntas[preguntaActual].tiempo_respuesta);
+        }
+    }, [preguntaActual, partidaIniciada, partida]);
+
+    const iniciarTemporizador = (tiempo) => {
+        setTiempoRestante(tiempo);
+        const interval = setInterval(() => {
+            setTiempoRestante((prevTiempo) => {
+                if (prevTiempo <= 1) {
+                    clearInterval(interval);
+                    setPreguntaActual((prevPreguntaActual) => prevPreguntaActual + 1);
+                    return 0;
+                }
+                return prevTiempo - 1;
+            });
+        }, 1000);
+    };
 
     if (!partida) {
         return <div>Cargando...</div>;
@@ -101,6 +123,7 @@ const SalaPartida = () => {
                         <div>
                             <h3>Pregunta {preguntaActual + 1}:</h3>
                             <h4>{partida.preguntas[preguntaActual].texto}</h4>
+                            <div>Tiempo restante: {tiempoRestante} segundos</div>
                             {partida.preguntas[preguntaActual].opciones.map((opcion) => (
                                 <button key={opcion.id} onClick={() => seleccionarOpcion(opcion.es_correcta)}>
                                     {opcion.texto}
