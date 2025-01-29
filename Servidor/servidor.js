@@ -118,7 +118,7 @@ io.on('connection', (socket) => {
                         deleteTimers[pin] = setTimeout(async () => {
                         await deleteDoc(doc(dbFirestore, 'partidas', partidaDoc.id));
                         delete deleteTimers[pin];
-                }, 60000); // 60 segundos
+                        }, 60000); // 60 segundos
                     } else{
                         await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { jugadores: jugadoresActualizados });
                     }
@@ -129,6 +129,11 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    socket.on('startGame', async ({ pin }) => {
+        io.to(pin).emit('partidaIniciada');
+    });
+
 });
 
 app.get('/', (req, res) => {
@@ -175,10 +180,42 @@ app.get('/partidas/:pin', async (req, res) => {
                 } else {
                     partida.cuestionario_nombre = 'Cuestionario no encontrado';
                 }
-                partidas.push(partida);
-                if (partidas.length === querySnapshot.docs.length) {
-                    res.json(partidas);
-                }
+
+                // Obtener preguntas del cuestionario
+                const preguntasQuery = `SELECT * FROM Preguntas WHERE cuestionario_id = ${cuestionarioId}`;
+                db.query(preguntasQuery, (err, preguntas) => {
+                    if (err) {
+                        console.error('Error getting preguntas:', err);
+                        res.status(500).json({ error: 'Error getting preguntas' });
+                        return;
+                    }
+                    const preguntasIds = preguntas.map(p => p.id);
+                    if (preguntasIds.length === 0) {
+                        partida.preguntas = [];
+                        partidas.push(partida);
+                        if (partidas.length === querySnapshot.docs.length) {
+                            res.json(partidas);
+                        }
+                    } else {
+                        const opcionesQuery = `SELECT * FROM Opciones WHERE pregunta_id IN (${preguntasIds.join(',')})`;
+                        db.query(opcionesQuery, (err, opciones) => {
+                            if (err) {
+                                console.error('Error getting opciones:', err);
+                                res.status(500).json({ error: 'Error getting opciones' });
+                                return;
+                            }
+                            const preguntasConOpciones = preguntas.map(pregunta => ({
+                                ...pregunta,
+                                opciones: opciones.filter(opcion => opcion.pregunta_id === pregunta.id)
+                            }));
+                            partida.preguntas = preguntasConOpciones;
+                            partidas.push(partida);
+                            if (partidas.length === querySnapshot.docs.length) {
+                                res.json(partidas);
+                            }
+                        });
+                    }
+                });
             });
         }
     } catch (error) {
@@ -326,6 +363,32 @@ app.delete('/preguntas/:id', (req, res) => {
     db.query(sql, valores, (err, data) => {
         if (err) return res.json(err);
         return res.json({ "status": "ok" });
+    });
+});
+
+app.get('/preguntas/:cuestionario_id', (req, res) => {
+    const sqlPreguntas = "SELECT * FROM Preguntas WHERE cuestionario_id=?";
+    const valoresPreguntas = [req.params.cuestionario_id];
+
+    db.query(sqlPreguntas, valoresPreguntas, (err, preguntas) => {
+        if (err) return res.json(err);
+
+        const preguntasIds = preguntas.map(p => p.id);
+        if (preguntasIds.length === 0) {
+            return res.json(preguntas);
+        }
+
+        const sqlRespuestas = "SELECT * FROM Respuestas WHERE pregunta_id IN (?)";
+        db.query(sqlRespuestas, [preguntasIds], (err, respuestas) => {
+            if (err) return res.json(err);
+
+            const preguntasConRespuestas = preguntas.map(p => ({
+                ...p,
+                respuestas: respuestas.filter(r => r.pregunta_id === p.id)
+            }));
+
+            return res.json(preguntasConRespuestas);
+        });
     });
 });
 

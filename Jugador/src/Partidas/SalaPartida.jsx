@@ -10,6 +10,8 @@ const SalaPartida = () => {
     const location = useLocation();
     const [partida, setPartida] = useState(null);
     const [jugador, setJugador] = useState(location.state?.jugador || null); // Estado para almacenar el jugador
+    const [partidaIniciada, setPartidaIniciada] = useState(false);
+    const [preguntaActual, setPreguntaActual] = useState(0);
 
     useEffect(() => {
         const obtenerPartida = async () => {
@@ -53,6 +55,11 @@ const SalaPartida = () => {
             }));
         });
 
+        socket.on('partidaIniciada', () => {
+            setPartidaIniciada(true);
+            console.log('La partida ha comenzado');
+        });
+
         return () => {
             socket.off('newPlayer');
             socket.off('playerLeft');
@@ -68,11 +75,43 @@ const SalaPartida = () => {
         return <div>Cargando...</div>;
     }
 
+    const iniciarPartida = () => {
+        socket.emit('startGame', { pin });
+        setPartidaIniciada(true);  
+    }
+    
+    const seleccionarOpcion = (esCorrecta) => {
+        if(esCorrecta) {
+            alert('Respuesta correcta');
+        } else {
+            alert('Respuesta incorrecta');
+        }
+        setPreguntaActual((prevPreguntaActual) => prevPreguntaActual + 1);
+    }
+
     return (
         <>
             <h1>Sala de Partida: {partida.nombre_de_la_sala}</h1>
             <h2>Cuestionario: {partida.cuestionario_nombre}</h2>
-            <button>Empezar Partida</button>
+            {!partidaIniciada ? (
+                <button onClick={iniciarPartida}>Empezar Partida</button>
+            ) : (
+                <div>
+                    {preguntaActual < partida.preguntas.length ? (
+                        <div>
+                            <h3>Pregunta {preguntaActual + 1}:</h3>
+                            <h4>{partida.preguntas[preguntaActual].texto}</h4>
+                            {partida.preguntas[preguntaActual].opciones.map((opcion) => (
+                                <button key={opcion.id} onClick={() => seleccionarOpcion(opcion.es_correcta)}>
+                                    {opcion.texto}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <h3>¡Has completado el cuestionario!</h3>
+                    )}
+                </div>
+            )}
             <ul>
                 {partida.jugadores.map((jugador) => (
                     <li key={jugador.id}>{jugador.nombre}</li> // Usar id como clave única
