@@ -65,8 +65,13 @@ io.on('connection', (socket) => {
 
                 // Emitir evento a todos los clientes en la sala
                 io.to(pin).emit('newPlayer', jugador);
+                io.to(pin).emit('jugadoresActualizados', jugadoresActualizados);
             }
         }
+    });
+
+    socket.on('siguientePregunta', ({ pin, nuevaPregunta }) => {
+        io.to(pin).emit('actualizarPregunta', nuevaPregunta);
     });
 
     socket.on('leaveRoom', async ({ pin, jugador }) => {
@@ -93,6 +98,30 @@ io.on('connection', (socket) => {
             io.to(pin).emit('playerLeft', jugador);
         }
     });
+
+    socket.on('actualizarPuntuacion', async ({ pin, jugadorId, incremento }) => {
+        try {
+            const q = query(collection(dbFirestore, 'partidas'), where("pin_de_la_sala", "==", pin));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                const partidaDoc = querySnapshot.docs[0];
+                const partidaData = partidaDoc.data();
+                const jugador = partidaData.jugadores.find(j => j.id === jugadorId);
+                
+                if (jugador) {
+                    // Emitir actualización a todos los clientes
+                    io.to(pin).emit('puntuacionActualizada', {
+                        jugadorId,
+                        puntos: jugador.puntos + incremento
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error actualizando puntuación:', error);
+        }
+    });
+
 
     socket.on('disconnect', async () => {
         console.log('user disconnected');
@@ -243,6 +272,52 @@ app.post('/partidas/:pin/jugadores', async (req, res) => {
     } catch (error) {
         console.error('Error actualizando jugadores:', error);
         res.status(500).json({ error: 'Error actualizando jugadores' });
+    }
+});
+
+// Modifica este endpoint para manejar incrementos de puntos
+app.put('/partidas/:pin/jugadores/:jugadorId/puntos', async (req, res) => {
+    const { pin, jugadorId } = req.params;
+    const { incremento } = req.body; // Cambiar de puntos a incremento
+    
+    try {
+        const q = query(collection(dbFirestore, 'partidas'), where("pin_de_la_sala", "==", pin));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            const partidaDoc = querySnapshot.docs[0];
+            const partidaData = partidaDoc.data();
+            const jugadorIndex = partidaData.jugadores.findIndex(j => j.id === jugadorId);
+            
+            if (jugadorIndex !== -1) {
+                const jugadoresActualizados = [...partidaData.jugadores];
+                // Añadir campo puntos si no existe
+                if(!jugadoresActualizados[jugadorIndex].puntos) {
+                    jugadoresActualizados[jugadorIndex].puntos = 0;
+                }
+                // Incrementar puntos
+                jugadoresActualizados[jugadorIndex].puntos += incremento;
+                
+                await updateDoc(doc(dbFirestore, 'partidas', partidaDoc.id), { 
+                    jugadores: jugadoresActualizados 
+                });
+                
+                // Emitir actualización a todos los clientes
+                io.to(pin).emit('puntuacionActualizada', {
+                    jugadorId,
+                    puntos: jugadoresActualizados[jugadorIndex].puntos
+                });
+                
+                res.json({ status: 'ok' });
+            } else {
+                res.status(404).json({ error: 'Jugador no encontrado' });
+            }
+        } else {
+            res.status(404).json({ error: 'Partida no encontrada' });
+        }
+    } catch (error) {
+        console.error('Error actualizando puntos:', error);
+        res.status(500).json({ error: 'Error actualizando puntos' });
     }
 });
 

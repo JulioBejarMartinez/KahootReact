@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 
@@ -7,29 +7,52 @@ let socket;
 const UnirseAPartida = () => {
     const [pin, setPin] = useState("");
     const [nombre, setNombre] = useState("");
+    const [socketInstance, setSocketInstance] = useState(null);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        return () => {
+            if (socketInstance) {
+                socketInstance.disconnect();
+            }
+        };
+    }, [socketInstance]);
 
     const handleJoin = async () => {
         try {
-            if (!socket) {
-                socket = io("http://localhost:4000");
-                socket.on('connect', () => {
-                    const jugador = { id: socket.id, nombre, socketId: socket.id }; // Asegurarse de que el jugador tenga un socketId único
-                    socket.emit('joinRoom', { pin, jugador });
-                    navigate(`/SalaPartida/${pin}`, { state: { jugador: { id: jugador.id, nombre: jugador.nombre } } });
+            const socket = io("http://localhost:4000");
+            setSocketInstance(socket);
+
+            socket.on('connect', () => {
+                const jugador = { 
+                    id: socket.id, 
+                    nombre, 
+                    socketId: socket.id,
+                    puntos: 0 
+                };
+                
+                socket.emit('joinRoom', { 
+                    pin, 
+                    jugador 
                 });
-            }
+                
+                navigate(`/SalaPartida/${pin}`, { 
+                    state: { jugador } 
+                });
+            });
+
         } catch (error) {
-            console.error('Error al unirse a la partida:', error);
+            console.error('Error al unirse:', error);
         }
     };
 
     const handleLeave = () => {
-        if (socket) {
-            const jugador = { id: socket.id, nombre, socketId: socket.id }; // Asegurarse de que el jugador tenga un socketId único
-            socket.emit('leaveRoom', { pin, jugador });
-            socket.disconnect();
-            socket = null;
+        if (socketInstance) {
+            socketInstance.emit('leaveRoom', { 
+                pin, 
+                jugador: { id: socketInstance.id } 
+            });
+            socketInstance.disconnect();
         }
         navigate('/');
     };

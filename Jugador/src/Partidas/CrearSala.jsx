@@ -68,8 +68,10 @@ const CrearSala = () => {
     return (
         <>
             <h1>Crear Sala</h1>
+            <div className="card text-white bg-dark mb-3" style={{maxWidth: "20rem" , display: "inline-block", margin: "10px"}}>
             <form onSubmit={crearUnaSala}>
                 <input
+                    className="form-control text-white bg-purple border border-light"
                     id="nombre_de_la_sala"
                     type="text"
                     name="nombre_de_la_sala"
@@ -77,7 +79,9 @@ const CrearSala = () => {
                     onChange={gestionSala}
                     value={sala.nombre_de_la_sala}
                 />
+                <br />
                 <select
+                    className="form-control text-white bg-purple border border-light"
                     name="creador_id"
                     onChange={gestionSala}
                     value={sala.creador_id}
@@ -89,7 +93,9 @@ const CrearSala = () => {
                         </option>
                     ))}
                 </select>
+                <br />
                 <select
+                    className="form-control text-white bg-purple border border-light"
                     name="cuestionario_id"
                     onChange={gestionSala}
                     value={sala.cuestionario_id}
@@ -101,8 +107,10 @@ const CrearSala = () => {
                         </option>
                     ))}
                 </select>
-                <button type="submit">Crear Sala</button>
+                <br />
+                <button type="submit" className="btn btn-success btn-lg w-100">Crear Sala</button>
             </form>
+            </div>
         </>
     );
 };
